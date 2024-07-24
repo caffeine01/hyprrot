@@ -87,7 +87,6 @@ void handle_orientation(enum Orientation orientation) {
     if (orientation == Undefined)
         return;
 
-<<<<<<< HEAD
     // transform display
     system_fmt("hyprctl keyword monitor %s,transform,%d", output, orientation);
 
@@ -98,8 +97,6 @@ void handle_orientation(enum Orientation orientation) {
 =======
     // transform display and touch devices with a hyprctl batch command
     system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d\"", output, orientation, orientation, orientation);
->>>>>>> ac5ee6dde9462ac21292a679de78116ab7dc915f
-}
 
 DBusMessage* request_orientation(DBusConnection* conn) {
 
