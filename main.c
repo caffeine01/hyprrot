@@ -11,6 +11,7 @@ enum Orientation { Normal, LeftUp, BottomUp, RightUp, Undefined};
 
 DBusError error;
 char* output = "eDP-1"; // Default output device
+int rotate_master_layout = 0; // Default layout
 
 void dbus_disconnect(DBusConnection* connection) {
     dbus_connection_flush(connection);
@@ -87,17 +88,44 @@ void handle_orientation(enum Orientation orientation) {
     if (orientation == Undefined)
         return;
 
-    // transform display
-    system_fmt("hyprctl keyword monitor %s,transform,%d", output, orientation);
+    // Ran if the --either --left-master or --right-master is pass in
+    // (pray that our lord and savior vaxry won't change hyprctl output)
+    if (rotate_master_layout == 1) {
+        if (orientation == Normal) { // --left-master flag
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:left\"", output, orientation, orientation, orientation, output);
+        }
+        else if (orientation == LeftUp) {
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:top\"", output, orientation, orientation, orientation, output);
+        }
+        else if (orientation == BottomUp) {
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:left\"", output, orientation, orientation, orientation, output);
+        }
+        else { // This covers RightUp orientation
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:top\"", output, orientation, orientation, orientation, output);
+        }
+    }
 
-    // transform touch devices
-    // (and pray that our lord and savior vaxry won't change hyprctl output)
-    system_fmt("hyprctl keyword input:touchdevice:transform %d", orientation);
-    system_fmt("hyprctl keyword input:tablet:transform %d", orientation);
-    
-    // transform display and touch devices with a hyprctl batch command
-    system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d\"", output, orientation, orientation, orientation);
+    else if (rotate_master_layout == 2) { // --right-master flag
+        if (orientation == Normal) {
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:right\"", output, orientation, orientation, orientation, output);
+        }
+        else if (orientation == LeftUp) {
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:top\"", output, orientation, orientation, orientation, output);
+        }
+        else if (orientation == BottomUp) {
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:right\"", output, orientation, orientation, orientation, output);
+        }
+        else { // This covers RightUp orientation
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:top\"", output, orientation, orientation, orientation, output);
+        }
+    }
+    else {
+        // Rotates monitor and touch device without changing layout if the --rotate-flag-layout flag is not passed
+        system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d\"", output, orientation, orientation, orientation);
+
+    }
 }
+
 DBusMessage* request_orientation(DBusConnection* conn) {
 
     // create request calling Get method
@@ -186,8 +214,18 @@ int main(int argc, char* argv[]) {
         printf("error: cannot open dbus connection\n");
         return 1;
     }
-    if (argc > 1) {
-        output = argv[1];
+
+    // Parse command-line arguments
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--left-master") == 0) {
+            rotate_master_layout = 1; // Enable rotate-layout if flag is found
+        }
+        else if (strcmp(argv[i], "--right-master") == 0) {
+            rotate_master_layout = 2; // Enable rotate-layout if flag is found
+        }
+        else {
+            output = argv[i];
+        }
     }
 
     // if hyprland and iio-hyprland are restarted after display is already rotated,
