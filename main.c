@@ -84,7 +84,7 @@ void system_fmt(char* format, ...) {
     va_end(args);
 }
 
-void handle_orientation(enum Orientation orientation) {
+void handle_orientation(enum Orientation orientation, const char* monitor_id) {
     if (orientation == Undefined)
         return;
 
@@ -92,31 +92,30 @@ void handle_orientation(enum Orientation orientation) {
     // (pray that our lord and savior vaxry won't change hyprctl output)
     if (rotate_master_layout == 1) {
         if (orientation == Normal) { // --left-master flag
-            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:left\"", output, orientation, orientation, orientation, output);
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:left\"", output, orientation, orientation, orientation, monitor_id);
         }
         else if (orientation == LeftUp) {
-            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:top\"", output, orientation, orientation, orientation, output);
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:top\"", output, orientation, orientation, orientation, monitor_id);
         }
         else if (orientation == BottomUp) {
-            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:left\"", output, orientation, orientation, orientation, output);
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:left\"", output, orientation, orientation, orientation, monitor_id);
         }
         else { // This covers RightUp orientation
-            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:top\"", output, orientation, orientation, orientation, output);
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:top\"", output, orientation, orientation, orientation, monitor_id);
         }
     }
-
     else if (rotate_master_layout == 2) { // --right-master flag
         if (orientation == Normal) {
-            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:right\"", output, orientation, orientation, orientation, output);
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:right\"", output, orientation, orientation, orientation, monitor_id);
         }
         else if (orientation == LeftUp) {
-            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:bottom\"", output, orientation, orientation, orientation, output);
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:bottom\"", output, orientation, orientation, orientation, monitor_id);
         }
         else if (orientation == BottomUp) {
-            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:right\"", output, orientation, orientation, orientation, output);
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:right\"", output, orientation, orientation, orientation, monitor_id);
         }
         else { // This covers RightUp orientation
-            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:bottom\"", output, orientation, orientation, orientation, output);
+            system_fmt("hyprctl --batch \"keyword monitor %s,transform,%d ; keyword input:touchdevice:transform %d ; keyword input:tablet:transform %d ; keyword workspace m[%s], layoutopt:orientation:bottom\"", output, orientation, orientation, orientation, monitor_id);
         }
     }
     else {
@@ -173,16 +172,16 @@ enum Orientation parse_orientation_reply(DBusMessage* reply) {
     return property_to_enum(orientation);
 }
 
-void init_orientation(DBusConnection* conn) {
+void init_orientation(DBusConnection* conn, const char* monitor_id) {
 // this function proactively requests current orientation, even if not changed
     DBusMessage* reply = request_orientation(conn);
     if (reply != NULL) {
-        handle_orientation(parse_orientation_reply(reply));
+        handle_orientation(parse_orientation_reply(reply), monitor_id);
         dbus_message_unref(reply);
     }
 }
 
-void listen_orientation(DBusConnection* connection) {
+void listen_orientation(DBusConnection* connection, const char* monitor_id) {
 // this function passively listens for changes to orientation
     DBusMessage* msg;
     dbus_bus_add_match(connection,
@@ -198,7 +197,7 @@ void listen_orientation(DBusConnection* connection) {
         if (msg != NULL) {
             if (dbus_message_is_signal(msg, "org.freedesktop.DBus.Properties",
                     "PropertiesChanged")) {
-                handle_orientation(parse_orientation_signal(msg));
+                handle_orientation(parse_orientation_signal(msg), monitor_id);
             } else {
                 dbus_message_unref(msg);
                 break;
@@ -206,6 +205,31 @@ void listen_orientation(DBusConnection* connection) {
             dbus_message_unref(msg);
         }
     }
+}
+
+char* get_monitor_id(const char* monitor_name) { 
+    // Monitor prop for workspace layoutopt rule isn't accepting monitor name, for some reason
+    // This is a workaround to get monitor ID instead
+
+    char command[256];
+    snprintf(command, sizeof(command), "hyprctl monitors %s -j | jq -r '.[] | select(.name==\"%s\") | .id'", monitor_name, monitor_name);
+    FILE* fp = popen(command, "r");
+    if (fp == NULL) {
+        perror("popen");
+        return NULL;
+    }
+
+    static char monitor_id[16];
+    if (fgets(monitor_id, sizeof(monitor_id), fp) == NULL) {
+        perror("fgets");
+        pclose(fp);
+        return NULL;
+    }
+
+    pclose(fp);
+    // Remove newline character if present
+    monitor_id[strcspn(monitor_id, "\n")] = '\0';
+    return monitor_id;
 }
 
 int main(int argc, char* argv[]) {
@@ -228,12 +252,20 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // Get monitor ID for the specified output
+    char* monitor_id = get_monitor_id(output);
+    if (monitor_id == NULL) {
+        printf("error: cannot get monitor ID for %s\n", output);
+        dbus_disconnect(connection);
+        return 1;
+    }
+
     // if hyprland and iio-hyprland are restarted after display is already rotated,
     // init_orientation ensures correct immediate orientation without
     // waiting for display to move
-    init_orientation(connection);
+    init_orientation(connection, monitor_id);
 
-    listen_orientation(connection);
+    listen_orientation(connection, monitor_id);
 
     dbus_disconnect(connection);
     return 0;
