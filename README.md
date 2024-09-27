@@ -74,3 +74,7 @@ Some users reported that specifying the monitor in hyprland.conf could be necess
 Should automatically rotate all Tablets and Touch Devices from `hyprctl devices`.
 Thank you to Desktop31 for fetching the `hyprctl devices` output.
 
+## Collaborators
+
+[<img src="https://github.com/{{ contributor }}.png" width="60px;"/><br /><sub><ahref="https://github.com/{{ contributor }}">{{ contributor }}</a></sub>](https://github.com/{{ForgotMyPasswd}}/{{iio-hyprland}}
+
