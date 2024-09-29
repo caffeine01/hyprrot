@@ -61,7 +61,7 @@ sudo make uninstall
 ```
 
 ## Running
-`iio-hyprland [monitor to rotate, default=eDP-1]`, run `hyprctl monitors` to list available outputs.
+`iio-hyprland [master window location] [monitor to rotate, default=eDP-1]`, run `hyprctl monitors` to list available outputs. Use either `--left-master` or `--right-master` to set the master window location to the left/top or right/bottom, leave blank to not adjust window layout on rotate. 
 
 Add `exec-once = iio-hyprland` to `~/.config/hypr/hyprland.conf`
 
