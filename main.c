@@ -15,7 +15,7 @@ int rotate_master_layout = 0; // Default layout
 
 void dbus_disconnect(DBusConnection* connection) {
     dbus_connection_flush(connection);
-    dbus_connection_close(connection);
+    //dbus_connection_close(connection); should not be doing this ??
     dbus_connection_unref(connection);
     dbus_error_free(&error);
 }
